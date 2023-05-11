@@ -147,7 +147,9 @@ def process_video():
         prev_frame = frame.copy()
 
     # Calculate percentages for multiple faces
-    multiple_faces_percentage = multiple_faces_count / frame_count * 100
+    multiple_faces_percentage = 0
+    if frame_count:
+        multiple_faces_percentage = multiple_faces_count / frame_count * 100
 
     # Normalize scores to a scale of 1 to 10
     flatness_rating = int(np.interp(flatness_score, [0, 255], [1, 10]))
@@ -177,12 +179,12 @@ def process_video():
 
     bit_rate = format_metadata["bit_rate"]
     # hard coded, please refactor this
-    r_frame_rate = "30/1"
+    r_frame_rate = stream_metadata[0]['r_frame_rate']
     resolution = "1920x1080"
-    blockiness_rating = 123
+    # blockiness_rating = 123
 
     cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, ssim_avg, vif_avg, bit_rate, r_frame_rate, resolution) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal, %s::decimal, %s::decimal, %s::bigint, %s::text, %s::text)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, ssim_avg, vif_avg, bit_rate, r_frame_rate, resolution))
-
+    conn.commit()
     # Create response dictionary
     response = {
         'frame_count': frame_count,
@@ -225,7 +227,7 @@ def get_video_parameters():
 
     bit_rate = format_metadata["bit_rate"]
     # hard coded, please refactor this
-    r_frame_rate = "30/1"
+    r_frame_rate = stream_metadata[0]['r_frame_rate']
     bit_rate = "1920x1080"
 
     cursor.execute("INSERT INTO video_stats (bit_rate, r_frame_rate, resolution) VALUES (%s::bigint, %s::text, %s::text)", (bit_rate, r_frame_rate, resolution))
