@@ -28,7 +28,7 @@ cursor = conn.cursor()
 @app.route('/create_users_table')
 def create_users_table():
     # Create a table to store video stats
-    cursor.execute('CREATE TABLE video_stats (id SERIAL PRIMARY KEY, blockiness_rating INTEGER, blurriness_rating INTEGER, flatness_rating INTEGER, frame_count INTEGER, multiple_faces_percentage TEXT, psnr_avg TEXT, ssim_avg TEXT, vif_avg TEXT, bit_rate BIGINT, r_frame_rate TEXT, resolution TEXT)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS video_stats (id SERIAL PRIMARY KEY, blockiness_rating INTEGER, blurriness_rating INTEGER, flatness_rating INTEGER, frame_count INTEGER, multiple_faces_percentage TEXT, psnr_avg TEXT, ssim_avg TEXT, vif_avg TEXT, bit_rate BIGINT, r_frame_rate TEXT, resolution TEXT)')
     conn.commit()
     return 'Users table created successfully'
 
