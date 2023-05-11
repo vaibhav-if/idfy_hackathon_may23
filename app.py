@@ -3,6 +3,7 @@
 # import numpy as np
 import subprocess
 import json
+import psycopg2
 
 from flask import Flask, request, jsonify
 import cv2
@@ -11,8 +12,53 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 from vifp import vifp_mscale
 
+
 app = Flask(__name__)
-    # Initialize the face detector
+
+# Connect to the database
+conn = psycopg2.connect(
+    host='localhost',
+    database='video_solutions',
+    user='vaibhavagrawal',
+    password='vaibhavagrawal'
+)
+cursor = conn.cursor()
+
+# Define a route to create the users table
+@app.route('/create_users_table')
+def create_users_table():
+    # Create a table to store video stats
+    cursor.execute('CREATE TABLE video_stats (id SERIAL PRIMARY KEY, blockiness_rating INTEGER, blurriness_rating INTEGER, flatness_rating INTEGER, frame_count INTEGER, multiple_faces_percentage TEXT, psnr_avg TEXT, ssim_avg TEXT, vif_avg TEXT, bit_rate BIGINT, r_frame_rate TEXT, resolution TEXT)')
+    conn.commit()
+    return 'Users table created successfully'
+
+
+# Define a route to create the users table
+@app.route('/video_stats')
+def video_stats():
+    # Create a table to store video stats
+    cursor.execute('SELECT * FROM video_stats')
+    rows = cursor.fetchall()
+    results = []
+    for row in rows:
+        result = {
+            'id': row[0],
+            'blockiness_rating': row[1],
+            'blurriness_rating': row[2],
+            'flatness_rating': row[3],
+            'frame_count': row[4],
+            'multiple_faces_percentage': float(row[5]),
+            'psnr_avg': float(row[6]),
+            'ssim_avg': float(row[7]),
+            'vif_avg': float(row[8]),
+            'bit_rate': row[9],
+            'r_frame_rate': row[10],
+            'resolution': row[11]
+        }
+        results.append(result)
+    return jsonify(results)
+
+# Initialize the face detector
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 # Define route for processing video
 @app.route('/process_video', methods=['POST'])
@@ -109,6 +155,27 @@ def process_video():
     else:
         psnr_avg = ssim_avg = vif_avg = 0
 
+    cmd = ['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', video_path]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = result.stdout.decode('utf-8')
+    data = json.loads(output)
+
+    # Extract format metadata
+    format_metadata = data['format']
+
+    # Extract stream metadata
+    stream_metadata = []
+    for stream in data['streams']:
+        stream_metadata.append(stream)
+
+    bit_rate = format_metadata["bit_rate"]
+    # hard coded, please refactor this
+    r_frame_rate = "30/1"
+    resolution = "1920x1080"
+    blockiness_rating = 123
+
+    cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, ssim_avg, vif_avg, bit_rate, r_frame_rate, resolution) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal, %s::decimal, %s::decimal, %s::bigint, %s::text, %s::text)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, ssim_avg, vif_avg, bit_rate, r_frame_rate, resolution))
+
     # Create response dictionary
     response = {
         'frame_count': frame_count,
@@ -118,7 +185,10 @@ def process_video():
         'blockiness_rating': blockiness_rating,
         'psnr_avg': psnr_avg,
         'ssim_avg': ssim_avg,
-        'vif_avg': vif_avg
+        'vif_avg': vif_avg,
+        'bit_rate': bit_rate,
+        'r_frame_rate': r_frame_rate,
+        'bit_rate': bit_rate
     }
 
     # Return the response as JSON
@@ -146,7 +216,19 @@ def get_video_parameters():
     for stream in data['streams']:
         stream_metadata.append(stream)
 
+    bit_rate = format_metadata["bit_rate"]
+    # hard coded, please refactor this
+    r_frame_rate = "30/1"
+    bit_rate = "1920x1080"
+
+    cursor.execute("INSERT INTO video_stats (bit_rate, r_frame_rate, resolution) VALUES (%s::bigint, %s::text, %s::text)", (bit_rate, r_frame_rate, resolution))
+
     return {'format': format_metadata, 'streams': stream_metadata}
+
+
+# Close the connection to the database
+# cursor.close()
+# conn.close()
 
 if __name__ == '__main__':
         app.run(debug=True)
