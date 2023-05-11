@@ -10,35 +10,33 @@ import numpy as np
 from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 from vifp import vifp_mscale
-from flask_cors import CORS
 
 app = Flask(__name__)
-    # Initialize the face detector
-CORS(app)
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+# Load the face detection model
+prototxt_path = 'deploy.prototxt'  # Path to the prototxt file
+caffemodel_path = 'res10_300x300_ssd_iter_140000.caffemodel'  # Path to the pre-trained caffemodel file
+net = cv2.dnn.readNetFromCaffe(prototxt_path, caffemodel_path)
+
+# Define blockiness check function
+def blockiness(frame):
+    # Split the frame into 8x8 blocks
+    blocks = np.array([frame[y:y+8, x:x+8] for y in range(0, frame.shape[0], 8) for x in range(0, frame.shape[1], 8)])
+    # Calculate the standard deviation of each block
+    block_stddevs = np.std(blocks, axis=(1, 2))
+    # Calculate the mean standard deviation of all blocks
+    mean_stddev = np.mean(block_stddevs)
+    # Normalize the mean standard deviation to a scale of 1 to 10
+    blockiness_rating = int(np.interp(mean_stddev, [0, 30], [10, 1]))
+    return blockiness_rating
+
 # Define route for processing video
 @app.route('/process_video', methods=['POST'])
 def process_video():
-    print("req",request.files)
     # Load the video file
-    if 'video' not in request.files:
-        return 'No video file found', 400
     file = request.files['video']
     video_path = './uploaded_video.mp4'
     file.save(video_path)
-
-    # Define blockiness check function
-    def blockiness(frame):
-        # Split the frame into 8x8 blocks
-        blocks = np.array([frame[y:y+8, x:x+8] for y in range(0, frame.shape[0], 8) for x in range(0, frame.shape[1], 8)])
-        # Calculate the standard deviation of each block
-        block_stddevs = np.std(blocks, axis=(1, 2))
-        # Calculate the mean standard deviation of all blocks
-        mean_stddev = np.mean(block_stddevs)
-        # Normalize the mean standard deviation to a scale of 1 to 10
-        blockiness_rating = int(np.interp(mean_stddev, [0, 30], [10, 1]))
-        return blockiness_rating
 
     # Initialize variables for metrics
     frame_count = 0
@@ -66,9 +64,11 @@ def process_video():
         # Convert the frame to grayscale
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # Detect faces in the frame
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
+        # Detect faces in the frame using DNN face detection model
+        blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), (104.0, 177.0, 123.0))
+        net.setInput(blob)
+        detections = net.forward()
+        
         # Update multiple faces count
         if len(faces) > 1:
             multiple_faces_count += 1
@@ -82,8 +82,8 @@ def process_video():
         # Calculate blockiness score
         blockiness_score = min(blockiness_score, blockiness(frame))
 
-       # Calculate PSNR, SSIM, and VIF only every n frames (n = 5 in this case)
-        if frame_count % 5 == 0:
+       # Calculate PSNR, SSIM, and VIF only every n frames (n = 10 in this case)
+        if frame_count % 10 == 0:
             # Load previous frame
             prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
 
@@ -126,7 +126,7 @@ def process_video():
         'ssim_avg': ssim_avg,
         'vif_avg': vif_avg
     }
-    print(response)
+
     # Return the response as JSON
     return jsonify(response)
 
