@@ -19,6 +19,8 @@ const corsOptions = {
     origin: process.env.ALLOW_ORIGIN,
 };
 
+app.use(express.static("public"));
+
 app.use(cors(corsOptions));
 
 app.use(hostValidation({ hosts: allowHosts.split(",") }))
