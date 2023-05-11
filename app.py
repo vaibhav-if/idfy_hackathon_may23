@@ -11,6 +11,7 @@ import numpy as np
 from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 from vifp import vifp_mscale
+from flask_cors import CORS
 
 
 app = Flask(__name__)
@@ -59,11 +60,17 @@ def video_stats():
     return jsonify(results)
 
 # Initialize the face detector
+    # Initialize the face detector
+CORS(app)
+
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 # Define route for processing video
 @app.route('/process_video', methods=['POST'])
 def process_video():
+    print("req",request.files)
     # Load the video file
+    if 'video' not in request.files:
+        return 'No video file found', 400
     file = request.files['video']
     video_path = './uploaded_video.mp4'
     file.save(video_path)
@@ -190,7 +197,7 @@ def process_video():
         'r_frame_rate': r_frame_rate,
         'bit_rate': bit_rate
     }
-
+    print(response)
     # Return the response as JSON
     return jsonify(response)
 
