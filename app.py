@@ -16,12 +16,13 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
+CORS(app)
 # Connect to the database
 conn = psycopg2.connect(
     host='localhost',
-    database='video_solutions',
-    user='vaibhavagrawal',
-    password='vaibhavagrawal'
+    database='zipnewdb',
+    user='admin',
+    password='admin'
 )
 cursor = conn.cursor()
 
@@ -61,7 +62,6 @@ def video_stats():
 
 # Initialize the face detector
     # Initialize the face detector
-CORS(app)
 
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 # Define route for processing video
