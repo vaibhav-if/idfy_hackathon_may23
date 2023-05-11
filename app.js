@@ -8,7 +8,7 @@ const cors = require("cors");
 const fileUpload = require("express-fileupload"); 
 const nocache = require('node-nocache');
 const { xss } = require('express-xss-sanitizer');
-const config = require('./config')
+const config = require('./config');
 
 const {port, allowHosts} = config;
 
@@ -62,5 +62,7 @@ function errorHandler(err, req, res, next) {
         message: "There is some error processing request."
     });
 }
+
+require("./routes/index")(app);
 
 module.exports = app;
