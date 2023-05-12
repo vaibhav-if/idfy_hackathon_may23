@@ -89,6 +89,14 @@ def video_stats():
     cursor.execute("SELECT resolution, COUNT(*) AS count FROM video_stats GROUP BY resolution ORDER BY count DESC LIMIT 1")
     resolution = cursor.fetchall()[0][0]
 
+    cursor.execute("SELECT resolution, COUNT(*) as count FROM video_stats GROUP BY resolution")
+    resolution_group_by = cursor.fetchall()
+    # print(resolution_group_by)
+
+    cursor.execute("SELECT video_quality, COUNT(*) as count FROM video_stats GROUP BY video_quality")
+    video_quality_groub_by = cursor.fetchall()
+
+    print(video_quality_groub_by)
 
     video_quality = calculate_video_quality(blurriness,flatness,blockiness,resolution,average_bit_rate[0][0],average_frame_rate_rows[0][0],psnr_value)
 
@@ -101,10 +109,13 @@ def video_stats():
     "multiple_faces_percentage": multiple_faces_percentage_percentage,
     "flatness": flatness,
     "average_frame_rate": average_frame_rate_rows[0][0],
-    "average_bit_rate": average_bit_rate[0][0],
+    "average_bit_rate": int(average_bit_rate[0][0])/1000000,
     "psnr": psnr_value,
     "resolution" : resolution,
-    "video_quality" : video_quality
+    "video_quality" : video_quality,
+    "resolution_group": resolution_group_by,
+    "video_quality_group": video_quality_groub_by 
+
     }
     
     return jsonify(results)
@@ -226,7 +237,7 @@ def process_video():
     # blockiness_rating = 123
     video_quality = calculate_video_quality(blurriness_rating,flatness_rating,blockiness_rating,resolution,bit_rate,r_frame_rate.split('/')[0],psnr_avg)
 
-    cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg,  bit_rate, r_frame_rate, resolution, video_quality) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal,  %s::bigint, %s::text, %s::text, %s::bigint)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, bit_rate, r_frame_rate, resolution, int(video_quality)))
+    cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg,  bit_rate, r_frame_rate, resolution, video_quality) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal,  %s::bigint, %s::text, %s::text, %s::bigint)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, bit_rate, r_frame_rate, resolution, round(int(video_quality))))
     conn.commit()
     # Create response dictionary
     response = {
