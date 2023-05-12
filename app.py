@@ -1,6 +1,3 @@
-# from flask import Flask, request, jsonify
-# import cv2
-# import numpy as np
 import subprocess
 import json
 import psycopg2
@@ -69,7 +66,7 @@ def get_video_stats(id):
     return jsonify(video_stat)
 
 
-# Define a route to create the video stats table
+# Define a route to get all video stats for dashboard
 @app.route('/video_stats')
 def video_stats():
     # Create a table to store video stats
@@ -142,15 +139,15 @@ def video_stats():
 
 # Initialize the face detector
     # Initialize the face detector
-
 face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+
 # Define route for processing video
 @app.route('/process_video', methods=['POST'])
 def process_video():
     print("req",request.files)
-    # Load the video file
     if 'video' not in request.files:
         return 'No video file found', 400
+    # Load the video file
     file = request.files['video']
     video_path = './uploaded_video.mp4'
     file.save(video_path)
@@ -204,10 +201,7 @@ def process_video():
         # Calculate blurriness score
         blurriness_score = min(blurriness_score, cv2.Laplacian(gray, cv2.CV_64F).var())
 
-        # Calculate blockiness score
-      #  blockiness_score = min(blockiness_score, blockiness(frame))
-
-       # Calculate PSNR, SSIM, and VIF only every n frames (n = 5 in this case)
+        # Calculate PSNR, SSIM, and VIF only every n frames (n = 5 in this case)
         if frame_count % 5 == 0:
             # Load previous frame
             prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
@@ -254,14 +248,14 @@ def process_video():
 
     resolution = min(width, height)
 
-    # blockiness_rating = 123
     video_quality = calculate_video_quality(blurriness_rating,flatness_rating,blockiness_rating,resolution,bit_rate,r_frame_rate.split('/')[0],psnr_avg)
 
     cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg,  bit_rate, r_frame_rate, resolution, video_quality) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal,  %s::bigint, %s::text, %s::text, %s::bigint)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, bit_rate, r_frame_rate, resolution, round(int(video_quality))))
     conn.commit()
+
     cursor.execute("SELECT id FROM video_stats ORDER BY id DESC LIMIT 1")
     result = cursor.fetchone()[0]
-    # Create response dictionary
+    
     response = {
         'call_id': result,
         'frame_count': frame_count,
@@ -280,10 +274,6 @@ def process_video():
     # Return the response as JSON
     return jsonify(response)
 
-
-# Close the connection to the database
-# cursor.close()
-# conn.close()
 
 if __name__ == '__main__':
         app.run(debug=True)
