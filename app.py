@@ -9,8 +9,6 @@ from flask import Flask, request, jsonify
 import cv2
 import numpy as np
 from skimage.metrics import peak_signal_noise_ratio as psnr
-from skimage.metrics import structural_similarity as ssim
-from vifp import vifp_mscale
 from flask_cors import CORS
 
 
@@ -30,7 +28,7 @@ cursor = conn.cursor()
 @app.route('/create_users_table')
 def create_users_table():
     # Create a table to store video stats
-    cursor.execute('CREATE TABLE IF NOT EXISTS video_stats (id SERIAL PRIMARY KEY, blockiness_rating INTEGER, blurriness_rating INTEGER, flatness_rating INTEGER, frame_count INTEGER, multiple_faces_percentage TEXT, psnr_avg TEXT, ssim_avg TEXT, vif_avg TEXT, bit_rate BIGINT, r_frame_rate TEXT, resolution TEXT)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS video_stats (id SERIAL PRIMARY KEY, blockiness_rating INTEGER, blurriness_rating INTEGER, flatness_rating INTEGER, frame_count INTEGER, multiple_faces_percentage TEXT, psnr_avg TEXT,  bit_rate BIGINT, r_frame_rate TEXT, resolution TEXT)')
     conn.commit()
     return 'Users table created successfully'
 
@@ -51,11 +49,9 @@ def video_stats():
             'frame_count': row[4],
             'multiple_faces_percentage': float(row[5]),
             'psnr_avg': float(row[6]),
-            'ssim_avg': float(row[7]),
-            'vif_avg': float(row[8]),
-            'bit_rate': row[9],
-            'r_frame_rate': row[10],
-            'resolution': row[11]
+            'bit_rate': row[7],
+            'r_frame_rate': row[8],
+            'resolution': row[9]
         }
         results.append(result)
     return jsonify(results)
@@ -94,8 +90,6 @@ def process_video():
     blurriness_score = 10
     blockiness_score = 10
     psnr_sum = 0
-    ssim_sum = 0
-    vif_sum = 0
 
     # Open the video file
     cap = cv2.VideoCapture(video_path)
@@ -127,7 +121,7 @@ def process_video():
         blurriness_score = min(blurriness_score, cv2.Laplacian(gray, cv2.CV_64F).var())
 
         # Calculate blockiness score
-        blockiness_score = min(blockiness_score, blockiness(frame))
+      #  blockiness_score = min(blockiness_score, blockiness(frame))
 
        # Calculate PSNR, SSIM, and VIF only every n frames (n = 5 in this case)
         if frame_count % 5 == 0:
@@ -137,11 +131,9 @@ def process_video():
             # Calculate PSNR
             psnr_sum += psnr(prev_gray, gray)
 
-            # Calculate SSIM
-            ssim_sum += ssim(prev_gray, gray, data_range=gray.max() - gray.min())
+            # Calculate blockiness score
+            blockiness_score = min(blockiness_score, blockiness(frame))
 
-            # Calculate VIF
-            vif_sum += vifp_mscale(prev_gray, gray)
 
         # Save current frame for next iteration
         prev_frame = frame.copy()
@@ -157,13 +149,7 @@ def process_video():
     blockiness_rating = blockiness_score
 
     # Calculate average metrics
-    if frame_count > 1:
-        psnr_avg = psnr_sum / (frame_count - 1)
-        ssim_avg = ssim_sum / (frame_count - 1)
-        vif_avg = vif_sum / (frame_count - 1)
-    else:
-        psnr_avg = ssim_avg = vif_avg = 0
-
+    psnr_avg = psnr_sum / (frame_count - 1) if frame_count > 1 else 0
     cmd = ['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', video_path]
     result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output = result.stdout.decode('utf-8')
@@ -178,12 +164,15 @@ def process_video():
         stream_metadata.append(stream)
 
     bit_rate = format_metadata["bit_rate"]
-    # hard coded, please refactor this
     r_frame_rate = stream_metadata[0]['r_frame_rate']
-    resolution = "1920x1080"
+    width = stream_metadata[0]['coded_width']
+    height = stream_metadata[0]['coded_height']
+
+    resolution = min(width, height)
+
     # blockiness_rating = 123
 
-    cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, ssim_avg, vif_avg, bit_rate, r_frame_rate, resolution) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal, %s::decimal, %s::decimal, %s::bigint, %s::text, %s::text)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, ssim_avg, vif_avg, bit_rate, r_frame_rate, resolution))
+    cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg,  bit_rate, r_frame_rate, resolution) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal,  %s::bigint, %s::text, %s::text)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, bit_rate, r_frame_rate, resolution))
     conn.commit()
     # Create response dictionary
     response = {
@@ -193,11 +182,10 @@ def process_video():
         'blurriness_rating': blurriness_rating,
         'blockiness_rating': blockiness_rating,
         'psnr_avg': psnr_avg,
-        'ssim_avg': ssim_avg,
-        'vif_avg': vif_avg,
-        'bit_rate': bit_rate,
+   
         'r_frame_rate': r_frame_rate,
-        'bit_rate': bit_rate
+        'bit_rate': bit_rate,
+        'resolution':resolution
     }
     print(response)
     # Return the response as JSON
