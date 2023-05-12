@@ -39,57 +39,21 @@ def video_stats():
     # Create a table to store video stats
     cursor.execute('SELECT * FROM video_stats')
     rows = cursor.fetchall()
-    
-    cursor.execute('SELECT * FROM video_stats order by blurriness_rating desc')
-    blur_rows = cursor.fetchall()
-    p90_bur_row = (len(blur_rows) * 9)/10;
-    blurriness = blur_rows[int(p90_bur_row)-1][2]
-
-    cursor.execute('SELECT * FROM video_stats order by blockiness_rating desc')
-    block_rows = cursor.fetchall()
-    p90_block_row = (len(block_rows) * 9)/10;
-    blockiness = block_rows[int(p90_block_row)-1][1]
-    
-    cursor.execute('SELECT * FROM video_stats order by flatness_rating desc')
-    flat_rows = cursor.fetchall()
-    p90_flat_row = (len(flat_rows) * 9)/10;
-    flatness = flat_rows[int(p90_flat_row)-1][3]
-    
-    cursor.execute("SELECT AVG(CAST(SPLIT_PART(r_frame_rate, '/', 1) AS float) / CAST(SPLIT_PART(r_frame_rate, '/', 2) AS float)) FROM video_stats")
-    average_frame_rate_rows = cursor.fetchall()
-    
-    cursor.execute("SELECT AVG(bit_rate) FROM video_stats")
-    average_bit_rate = cursor.fetchall()
-
-    cursor.execute("SELECT * FROM video_stats order by psnr_avg desc")
-    psnr_avg_rows = cursor.fetchall()
-    p90_psnr_row = (len(psnr_avg_rows) * 9)/10
-    psnr_value = psnr_avg_rows[int(p90_psnr_row)-1][6]
-
-    cursor.execute("SELECT COUNT(*) FROM video_stats WHERE CAST(multiple_faces_percentage AS float) > 0")
-    multiple_faces_percentage_count = cursor.fetchall()
-    multiple_faces_percentage_percentage = (multiple_faces_percentage_count[0][0] / len(rows)) * 100
-
-    cursor.execute("SELECT resolution, COUNT(*) AS count FROM video_stats GROUP BY resolution ORDER BY count DESC LIMIT 1")
-    resolution = cursor.fetchall()[0][0]
-
-
-
-
-
-
-    results = {
-    'total_completed_calls' : len(rows),
-    "blurriness": blurriness,
-    "blockiness": blockiness,
-    "multiple_faces_percentage": multiple_faces_percentage_percentage,
-    "flatness": flatness,
-    "average_frame_rate": average_frame_rate_rows[0][0],
-    "average_bit_rate": average_bit_rate[0][0],
-    "psnr": psnr_value,
-    "resolution" : resolution
-    }
-    
+    results = []
+    for row in rows:
+        result = {
+            'id': row[0],
+            'blockiness_rating': row[1],
+            'blurriness_rating': row[2],
+            'flatness_rating': row[3],
+            'frame_count': row[4],
+            'multiple_faces_percentage': float(row[5]),
+            'psnr_avg': float(row[6]),
+            'bit_rate': row[7],
+            'r_frame_rate': row[8],
+            'resolution': row[9]
+        }
+        results.append(result)
     return jsonify(results)
 
 # Initialize the face detector
