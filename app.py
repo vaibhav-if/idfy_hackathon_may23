@@ -18,9 +18,9 @@ CORS(app)
 # Connect to the database
 conn = psycopg2.connect(
     host='localhost',
-    database='zipnewdb',
-    user='admin',
-    password='admin'
+    database='video_solutions',
+    user='vaibhavagrawal',
+    password='vaibhavagrawal'
 )
 cursor = conn.cursor()
 
@@ -40,16 +40,36 @@ def calculate_video_quality(blurriness, flatness, blockiness, resolution, bit_ra
 
     return video_quality
 
-# Define a route to create the users table
-@app.route('/create_users_table')
-def create_users_table():
+# Define a route to create the video stats table
+@app.route('/create_video_stats_table')
+def create_video_stats_table():
     # Create a table to store video stats
     cursor.execute('CREATE TABLE IF NOT EXISTS video_stats (id SERIAL PRIMARY KEY, blockiness_rating INTEGER, blurriness_rating INTEGER, flatness_rating INTEGER, frame_count INTEGER, multiple_faces_percentage TEXT, psnr_avg TEXT,  bit_rate BIGINT, r_frame_rate TEXT, resolution TEXT, video_quality BIGINT)')
     conn.commit()
     return 'Users table created successfully'
 
 
-# Define a route to create the users table
+# Define a route to get a specific video stat by id
+@app.route('/video_stats/<int:id>')
+def get_video_stats(id):
+    if id is None:
+        return f"Video stat with id {id} not found", 404
+    
+    # Create a query to get the video stat with the specified id
+    cursor.execute("SELECT * FROM video_stats WHERE id = %s", (id,))
+    row = cursor.fetchone()
+    
+    # Check if a video stat with the specified id was found
+    if row is None:
+        return f"Video stat with id {id} not found", 404
+    
+    # Convert the row to a dictionary and return it as JSON
+    columns = [column[0] for column in cursor.description]
+    video_stat = dict(zip(columns, row))
+    return jsonify(video_stat)
+
+
+# Define a route to create the video stats table
 @app.route('/video_stats')
 def video_stats():
     # Create a table to store video stats
@@ -239,8 +259,11 @@ def process_video():
 
     cursor.execute("INSERT INTO video_stats (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg,  bit_rate, r_frame_rate, resolution, video_quality) VALUES (%s::integer, %s::integer, %s::integer, %s::integer, %s::decimal, %s::decimal,  %s::bigint, %s::text, %s::text, %s::bigint)", (blockiness_rating, blurriness_rating, flatness_rating, frame_count, multiple_faces_percentage, psnr_avg, bit_rate, r_frame_rate, resolution, round(int(video_quality))))
     conn.commit()
+    cursor.execute("SELECT id FROM video_stats ORDER BY id DESC LIMIT 1")
+    result = cursor.fetchone()[0]
     # Create response dictionary
     response = {
+        'call_id': result,
         'frame_count': frame_count,
         'multiple_faces_percentage': multiple_faces_percentage,
         'flatness_rating': flatness_rating,
@@ -256,37 +279,6 @@ def process_video():
     print(response)
     # Return the response as JSON
     return jsonify(response)
-
-
-
-@app.route('/process', methods=['POST'])
-def get_video_parameters():
-
-    file = request.files['video']
-    video_path = './video-ag.webm'
-    file.save(video_path)
-
-    cmd = ['ffprobe', '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', video_path]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output = result.stdout.decode('utf-8')
-    data = json.loads(output)
-
-    # Extract format metadata
-    format_metadata = data['format']
-
-    # Extract stream metadata
-    stream_metadata = []
-    for stream in data['streams']:
-        stream_metadata.append(stream)
-
-    bit_rate = format_metadata["bit_rate"]
-    # hard coded, please refactor this
-    r_frame_rate = stream_metadata[0]['r_frame_rate']
-    bit_rate = "1920x1080"
-
-    cursor.execute("INSERT INTO video_stats (bit_rate, r_frame_rate, resolution) VALUES (%s::bigint, %s::text, %s::text)", (bit_rate, r_frame_rate, resolution))
-
-    return {'format': format_metadata, 'streams': stream_metadata}
 
 
 # Close the connection to the database
