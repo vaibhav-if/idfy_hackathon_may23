@@ -1,7 +1,7 @@
 import subprocess
 import json
 import psycopg2
-
+import math
 from flask import Flask, request, jsonify
 import cv2
 import numpy as np
@@ -30,7 +30,17 @@ def calculate_video_quality(blurriness, flatness, blockiness, resolution, bit_ra
     normalized_resolution = int(resolution) / 1080
     normalized_bit_rate = int(bit_rate) / 1000000  # Convert to Mbps
     normalized_frame_rate = int(frame_rate) / 30
-    normalized_psnr = int(psnr) / 50
+
+    try:
+        psnr = float(psnr)
+    except ValueError:
+        psnr = None
+
+    # check if psnr is infinite
+    if psnr is not None and math.isinf(psnr):
+        normalized_psnr = 0
+    else:
+        normalized_psnr = int(psnr) / 50
 
     # Calculate the video quality using the formula
     video_quality = 0.24 * normalized_blurriness + 0.1 * int(normalized_flatness) + 0.14 * int(normalized_blockiness) + 0.25 * normalized_resolution + 0.14 * int(normalized_bit_rate) + 0.09 * int(normalized_frame_rate) + 0.04 * int(normalized_psnr)
